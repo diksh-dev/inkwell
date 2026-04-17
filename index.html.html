@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inkwell — Your AI Journal</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cream: #faf6f0;
+  --parchment: #f2ead8;
+  --warm-tan: #e8d9bc;
+  --ink: #2a1f14;
+  --ink-light: #5c4a32;
+  --ink-muted: #9a8570;
+  --rust: #c4622d;
+  --rust-light: #e8956a;
+  --sage: #7a9e7e;
+  --sage-light: #b8d4bb;
+  --gold: #c9933a;
+  --border: rgba(90,60,30,0.12);
+  --border-warm: rgba(90,60,30,0.22);
+  --radius: 16px;
+  --radius-sm: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse at 20% 20%, rgba(201,147,58,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(122,158,126,0.06) 0%, transparent 60%);
+}
+
+/* Paper texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.025'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* NAV */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(250,246,240,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 60px;
+}
+.nav-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem; font-weight: 600;
+  color: var(--ink); letter-spacing: -0.5px;
+  display: flex; align-items: center; gap: 8px;
+}
+.nav-logo span { color: var(--rust); font-style: italic; }
+.nav-links { display: flex; gap: 4px; }
+.nav-link {
+  padding: 6px 14px; border-radius: 20px;
+  font-size: 0.85rem; font-weight: 500; cursor: pointer;
+  color: var(--ink-muted); border: none; background: none;
+  transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+}
+.nav-link:hover { color: var(--ink); background: var(--parchment); }
+.nav-link.active { color: var(--rust); background: rgba(196,98,45,0.08); }
+.nav-write {
+  padding: 8px 18px; border-radius: 20px;
+  background: var(--ink); color: var(--cream);
+  font-size: 0.85rem; font-weight: 500; cursor: pointer;
+  border: none; transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+}
+.nav-write:hover { background: var(--ink-light); }
+
+/* PAGE SYSTEM */
+.page { display: none; animation: fadeIn 0.3s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* LANDING */
+.hero {
+  max-width: 800px; margin: 0 auto;
+  padding: 5rem 2rem 3rem;
+  text-align: center;
+  position: relative; z-index: 1;
+}
+.hero-eyebrow {
+  display: inline-block;
+  font-size: 0.78rem; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--rust); font-weight: 500;
+  background: rgba(196,98,45,0.08);
+  padding: 4px 14px; border-radius: 20px; margin-bottom: 1.5rem;
+}
+.hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  line-height: 1.15; color: var(--ink);
+  margin-bottom: 1.25rem;
+  letter-spacing: -1px;
+}
+.hero h1 em { color: var(--rust); font-style: italic; }
+.hero p {
+  font-family: 'Lora', serif;
+  font-size: 1.1rem; line-height: 1.75;
+  color: var(--ink-light); max-width: 520px; margin: 0 auto 2.5rem;
+}
+.hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn-hero {
+  padding: 12px 28px; border-radius: 30px;
+  font-size: 0.95rem; font-weight: 500; cursor: pointer;
+  transition: all 0.2s; font-family: 'DM Sans', sans-serif; border: none;
+}
+.btn-hero-primary { background: var(--ink); color: var(--cream); }
+.btn-hero-primary:hover { background: var(--rust); transform: translateY(-1px); }
+.btn-hero-secondary { background: transparent; color: var(--ink); border: 1.5px solid var(--border-warm); }
+.btn-hero-secondary:hover { background: var(--parchment); }
+
+.features-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  max-width: 860px; margin: 3rem auto; padding: 0 2rem;
+  position: relative; z-index: 1;
+}
+.feature-card {
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.5rem;
+}
+.feature-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: var(--warm-tan); display: flex;
+  align-items: center; justify-content: center; margin-bottom: 1rem;
+  font-size: 18px;
+}
+.feature-card h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem; margin-bottom: 6px; color: var(--ink);
+}
+.feature-card p { font-size: 0.85rem; color: var(--ink-muted); line-height: 1.6; }
+
+/* STREAK BAR */
+.streak-banner {
+  max-width: 860px; margin: 0 auto 3rem; padding: 0 2rem;
+  position: relative; z-index: 1;
+}
+.streak-card {
+  background: linear-gradient(135deg, var(--parchment), var(--warm-tan));
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  display: flex; align-items: center; gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.streak-number {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.5rem; font-weight: 600; color: var(--rust);
+  line-height: 1;
+}
+.streak-label { font-size: 0.8rem; color: var(--ink-muted); margin-top: 2px; }
+.streak-divider { width: 1px; height: 40px; background: var(--border-warm); }
+.streak-dots { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.streak-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1.5px solid var(--border-warm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--ink-muted); font-weight: 500;
+  background: var(--cream);
+  transition: all 0.2s;
+}
+.streak-dot.done { background: var(--sage); border-color: var(--sage); color: #fff; }
+.streak-dot.today { background: var(--rust); border-color: var(--rust); color: #fff; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(196,98,45,0.3)} 50%{box-shadow:0 0 0 6px rgba(196,98,45,0)} }
+
+/* WRITE PAGE */
+.write-layout {
+  max-width: 900px; margin: 0 auto;
+  padding: 2rem 1.5rem;
+  display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem;
+  position: relative; z-index: 1;
+}
+.write-main {}
+.write-sidebar {}
+
+/* Paper card */
+.paper-card {
+  background: #fffdf8;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 20px rgba(90,60,30,0.06);
+  overflow: hidden;
+}
+.paper-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.paper-date {
+  font-family: 'Lora', serif; font-style: italic;
+  font-size: 0.9rem; color: var(--ink-muted);
+}
+.persona-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.persona-pill {
+  padding: 4px 12px; border-radius: 20px; font-size: 0.78rem;
+  cursor: pointer; border: 1px solid var(--border-warm);
+  background: transparent; color: var(--ink-muted);
+  transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+}
+.persona-pill:hover { border-color: var(--rust-light); color: var(--rust); }
+.persona-pill.active { background: var(--rust); color: #fff; border-color: var(--rust); }
+
+.paper-lines {
+  padding: 1.5rem;
+  background-image: repeating-linear-gradient(
+    transparent, transparent 31px, rgba(90,60,30,0.06) 31px, rgba(90,60,30,0.06) 32px
+  );
+  background-position: 0 8px;
+}
+textarea.journal-input {
+  width: 100%; min-height: 260px;
+  border: none; outline: none; resize: none;
+  font-family: 'Lora', serif; font-size: 1.05rem; line-height: 2rem;
+  color: var(--ink); background: transparent;
+}
+textarea.journal-input::placeholder { color: var(--warm-tan); font-style: italic; }
+.paper-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.btn-reflect {
+  padding: 9px 22px; border-radius: 22px;
+  background: var(--ink); color: var(--cream);
+  font-size: 0.88rem; font-weight: 500; cursor: pointer;
+  border: none; transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+}
+.btn-reflect:hover { background: var(--rust); }
+.btn-reflect:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-public {
+  padding: 9px 16px; border-radius: 22px;
+  background: transparent; color: var(--ink-light);
+  font-size: 0.85rem; cursor: pointer;
+  border: 1px solid var(--border-warm);
+  transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-public:hover { background: var(--parchment); }
+.btn-public.on { background: rgba(122,158,126,0.12); color: var(--sage); border-color: var(--sage-light); }
+.wc { font-size: 0.78rem; color: var(--ink-muted); margin-left: auto; }
+
+/* Reflection card */
+.reflection-card {
+  margin-top: 1rem;
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  display: none;
+}
+.reflection-card.visible { display: block; animation: fadeIn 0.4s ease; }
+.reflection-byline {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--ink-muted); margin-bottom: 0.75rem; font-weight: 500;
+}
+.reflection-text {
+  font-family: 'Lora', serif; font-size: 0.98rem; line-height: 1.85;
+  color: var(--ink-light); white-space: pre-wrap;
+}
+.loading-wave { display: flex; gap: 4px; align-items: center; height: 20px; }
+.loading-wave span {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--rust); display: inline-block;
+  animation: wave 1s infinite ease-in-out;
+}
+.loading-wave span:nth-child(2) { animation-delay: 0.15s; }
+.loading-wave span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes wave { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+/* Sidebar */
+.sidebar-card {
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+.sidebar-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 0.95rem; color: var(--ink);
+  margin-bottom: 1rem; padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.insight-row { margin-bottom: 10px; }
+.insight-key { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--ink-muted); margin-bottom: 3px; }
+.insight-val { font-size: 0.88rem; color: var(--ink); line-height: 1.4; }
+.mood-track { height: 5px; background: var(--warm-tan); border-radius: 3px; margin-top: 5px; overflow: hidden; }
+.mood-fill { height: 100%; background: var(--sage); border-radius: 3px; transition: width 0.6s ease; }
+.theme-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.theme-tag {
+  padding: 2px 9px; border-radius: 10px;
+  background: rgba(122,158,126,0.12); color: var(--sage);
+  font-size: 0.72rem; border: 1px solid var(--sage-light);
+}
+.btn-canva {
+  width: 100%; padding: 10px; border-radius: 10px;
+  background: #7c3fe4; color: #fff;
+  font-size: 0.85rem; font-weight: 500; cursor: pointer;
+  border: none; transition: opacity 0.2s; font-family: 'DM Sans', sans-serif;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 10px;
+}
+.btn-canva:hover { opacity: 0.88; }
+.btn-canva:disabled { opacity: 0.4; cursor: not-allowed; }
+.canva-status { font-size: 0.78rem; color: var(--ink-muted); margin-top: 6px; text-align: center; }
+.btn-copy-insights {
+  width: 100%; padding: 8px; border-radius: 10px;
+  background: transparent; color: var(--ink-light);
+  font-size: 0.82rem; cursor: pointer;
+  border: 1px solid var(--border-warm);
+  font-family: 'DM Sans', sans-serif; margin-top: 6px;
+  transition: all 0.15s;
+}
+.btn-copy-insights:hover { background: var(--warm-tan); }
+.canva-open-link {
+  display: block; text-align: center; margin-top: 8px;
+  font-size: 0.82rem; color: #7c3fe4; text-decoration: none;
+}
+.canva-open-link:hover { text-decoration: underline; }
+
+/* COMMUNITY */
+.community-layout {
+  max-width: 700px; margin: 0 auto;
+  padding: 2rem 1.5rem; position: relative; z-index: 1;
+}
+.community-header { margin-bottom: 2rem; }
+.community-header h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem; color: var(--ink); margin-bottom: 6px;
+}
+.community-header p { font-size: 0.88rem; color: var(--ink-muted); }
+.filter-row { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.filter-btn {
+  padding: 5px 14px; border-radius: 20px; font-size: 0.82rem;
+  cursor: pointer; border: 1px solid var(--border-warm);
+  background: transparent; color: var(--ink-muted);
+  transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+}
+.filter-btn.active { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+
+.feed-entry {
+  background: #fffdf8;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.feed-entry:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(90,60,30,0.08); }
+.feed-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.feed-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; color: #fff; flex-shrink: 0;
+}
+.feed-author { font-size: 0.85rem; font-weight: 500; color: var(--ink); }
+.feed-date { font-size: 0.78rem; color: var(--ink-muted); margin-left: auto; font-style: italic; }
+.feed-text {
+  font-family: 'Lora', serif; font-size: 0.95rem; line-height: 1.75;
+  color: var(--ink-light); margin-bottom: 10px;
+}
+.feed-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.feed-tag {
+  padding: 2px 9px; border-radius: 10px; font-size: 0.72rem;
+  background: var(--parchment); color: var(--ink-muted);
+  border: 1px solid var(--border);
+}
+.feed-heart {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.78rem; color: var(--ink-muted); cursor: pointer;
+  margin-top: 10px; width: fit-content;
+  transition: color 0.15s;
+  background: none; border: none; font-family: 'DM Sans', sans-serif;
+  padding: 0;
+}
+.feed-heart:hover { color: var(--rust); }
+.feed-heart.liked { color: var(--rust); }
+
+/* STREAK PAGE */
+.streak-layout {
+  max-width: 700px; margin: 0 auto;
+  padding: 2rem 1.5rem; position: relative; z-index: 1;
+}
+.streak-layout h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem; margin-bottom: 0.5rem;
+}
+.streak-layout > p { font-size: 0.88rem; color: var(--ink-muted); margin-bottom: 2rem; }
+.big-streak {
+  background: linear-gradient(135deg, #2a1f14, #5c4a32);
+  border-radius: var(--radius); padding: 2rem;
+  text-align: center; margin-bottom: 1.5rem; color: var(--cream);
+}
+.big-streak-num {
+  font-family: 'Playfair Display', serif;
+  font-size: 5rem; line-height: 1; color: var(--gold); font-weight: 600;
+}
+.big-streak-label { font-size: 0.85rem; color: rgba(250,246,240,0.6); margin-top: 4px; letter-spacing: 1px; text-transform: uppercase; }
+.calendar-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+  margin-bottom: 1.5rem;
+}
+.cal-day {
+  aspect-ratio: 1; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 500; color: var(--ink-muted);
+  background: var(--parchment); border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+.cal-day.wrote { background: var(--sage); border-color: var(--sage); color: #fff; }
+.cal-day.today-cal { background: var(--rust); border-color: var(--rust); color: #fff; font-weight: 700; }
+.cal-day.future { opacity: 0.35; }
+
+.habits-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.habit-card {
+  background: var(--parchment); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 1rem;
+}
+.habit-name { font-size: 0.88rem; font-weight: 500; margin-bottom: 6px; color: var(--ink); }
+.habit-bar { height: 4px; background: var(--warm-tan); border-radius: 2px; margin-bottom: 6px; overflow: hidden; }
+.habit-fill { height: 100%; background: var(--rust); border-radius: 2px; }
+.habit-stat { font-size: 0.75rem; color: var(--ink-muted); }
+
+/* Prompt toggle */
+.prompt-toggle-btn {
+  font-size: 0.78rem; color: var(--ink-muted); cursor: pointer;
+  text-decoration: underline; background: none; border: none;
+  font-family: 'DM Sans', sans-serif; padding: 0; margin-left: auto;
+}
+.prompt-viewer {
+  background: var(--ink); color: #b8a898;
+  font-family: monospace; font-size: 0.78rem; line-height: 1.65;
+  border-radius: var(--radius-sm); padding: 1rem 1.25rem;
+  white-space: pre-wrap; margin-top: 0.75rem; display: none;
+}
+.prompt-viewer.open { display: block; }
+
+/* Responsive */
+@media (max-width: 700px) {
+  .write-layout { grid-template-columns: 1fr; }
+  .features-grid { grid-template-columns: 1fr; }
+  .habits-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Ink<span>well</span></div>
+  <div class="nav-links">
+    <button class="nav-link active" id="nav-home">Home</button>
+    <button class="nav-link" id="nav-community">Community</button>
+    <button class="nav-link" id="nav-streaks">Streaks</button>
+  </div>
+  <button class="nav-write" id="nav-write">Write today</button>
+</nav>
+
+<!-- HOME PAGE -->
+<div class="page active" id="page-home">
+  <div class="hero">
+    <div class="hero-eyebrow">AI-powered journaling</div>
+    <h1>Write it down.<br><em>Understand yourself.</em></h1>
+    <p>Inkwell pairs your thoughts with AI reflection, Canva infographics, and a community of fellow journalers keeping their streak alive.</p>
+    <div class="hero-actions">
+      <button class="btn-hero btn-hero-primary" id="hero-start">Start writing</button>
+      <button class="btn-hero btn-hero-secondary" id="hero-community">Read the community</button>
+    </div>
+  </div>
+
+  <div id="home-streak-banner" class="streak-banner" style="display:none">
+    <div class="streak-card">
+      <div>
+        <div class="streak-number" id="home-streak-num">0</div>
+        <div class="streak-label">day streak</div>
+      </div>
+      <div class="streak-divider"></div>
+      <div class="streak-dots" id="home-streak-dots"></div>
+    </div>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">✦</div>
+      <h3>AI reflection</h3>
+      <p>4 unique voices — from a stoic mentor to a curious friend — reflect on every entry you write.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">◈</div>
+      <h3>Canva infographics</h3>
+      <p>Every entry becomes a beautiful visual infographic in your preferred Canva style, ready to share.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">❧</div>
+      <h3>Community feed</h3>
+      <p>Share entries publicly and read reflections from others on the same journey of self-discovery.</p>
+    </div>
+  </div>
+</div>
+
+<!-- WRITE PAGE -->
+<div class="page" id="page-write">
+  <div class="write-layout">
+    <div class="write-main">
+      <div class="paper-card">
+        <div class="paper-header">
+          <div class="paper-date" id="write-date"></div>
+          <div class="persona-pills" id="persona-pills"></div>
+        </div>
+        <div class="paper-lines">
+          <textarea class="journal-input" id="journal-input" placeholder="What's on your mind today..."></textarea>
+        </div>
+        <div class="paper-footer">
+          <button class="btn-reflect" id="reflect-btn">Reflect with Claude</button>
+          <button class="btn-public" id="public-btn" id="public-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
+            Private
+          </button>
+          <span class="wc" id="word-count">0 words</span>
+        </div>
+      </div>
+
+      <!-- Prompt viewer -->
+      <div style="margin-top:8px; display:flex; align-items:center; padding:0 4px;">
+        <span style="font-size:0.75rem; color:var(--ink-muted)">Learning Claude — </span>
+        <button class="prompt-toggle-btn" id="prompt-toggle-btn">view system prompt</button>
+      </div>
+      <div class="prompt-viewer" id="prompt-viewer"></div>
+
+      <!-- Reflection -->
+      <div class="reflection-card" id="reflection-card">
+        <div class="reflection-byline" id="reflection-byline"></div>
+        <div class="reflection-text" id="reflection-text"></div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="write-sidebar">
+      <div class="sidebar-card" id="insights-sidebar" style="display:none">
+        <div class="sidebar-title">Entry insights</div>
+        <div id="insights-content"></div>
+        <button class="btn-canva" id="canva-btn" id="canva-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M12 8v8"/></svg>
+          Create Canva infographic
+        </button>
+        <div class="canva-status" id="canva-status"></div>
+        <button class="btn-copy-insights" id="copy-btn" id="copy-btn" style="display:none">Copy insights text</button>
+        <a class="canva-open-link" id="canva-link" href="https://www.canva.com/d/yHIEsSSc7ZtN8Oj" target="_blank" style="display:none">Open Design 3 in Canva →</a>
+      </div>
+
+      <div class="sidebar-card">
+        <div class="sidebar-title">Past entries</div>
+        <div id="past-entries-list">
+          <p style="font-size:0.82rem; color:var(--ink-muted); font-style:italic">Your entries will appear here.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMMUNITY PAGE -->
+<div class="page" id="page-community">
+  <div class="community-layout">
+    <div class="community-header">
+      <h2>Community feed</h2>
+      <p>Public reflections from journalers around the world.</p>
+    </div>
+    <div class="filter-row" id="filter-row">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="Grateful">Grateful</button>
+      <button class="filter-btn" data-filter="Reflective">Reflective</button>
+      <button class="filter-btn" data-filter="Hopeful">Hopeful</button>
+      <button class="filter-btn" data-filter="Anxious">Anxious</button>
+    </div>
+    <div id="feed-list"></div>
+  </div>
+</div>
+
+<!-- STREAKS PAGE -->
+<div class="page" id="page-streaks">
+  <div class="streak-layout">
+    <h2>Your streak</h2>
+    <p>Build the habit of daily reflection, one entry at a time.</p>
+
+    <div class="big-streak">
+      <div class="big-streak-num" id="streak-big-num">0</div>
+      <div class="big-streak-label">days in a row</div>
+    </div>
+
+    <div class="sidebar-card" style="margin-bottom:1.5rem">
+      <div class="sidebar-title">April 2026</div>
+      <div class="calendar-grid" id="cal-grid"></div>
+    </div>
+
+    <div class="sidebar-card">
+      <div class="sidebar-title">Habit tracker</div>
+      <div class="habits-grid" id="habits-grid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PERSONAS = [
+  { id: 'guide', label: 'Gentle guide', prompt: `You are a warm, empathetic journaling companion. When the person shares a journal entry:\n1. Validate their feelings without judgment.\n2. Ask one thoughtful open question.\n3. Offer a small actionable suggestion.\nKeep under 150 words. Calm, supportive tone.` },
+  { id: 'stoic', label: 'Stoic mentor', prompt: `You are a Stoic philosophy mentor. When they share an entry:\n1. Acknowledge what is within their control vs outside it.\n2. Reframe using Stoic principles.\n3. Ask one pointed question about their values.\nKeep under 150 words. Quote a Stoic philosopher when relevant.` },
+  { id: 'coach', label: 'Action coach', prompt: `You are an energetic life coach. When someone shares a journal entry:\n1. Identify the core challenge or goal.\n2. Reframe limiting beliefs with a growth mindset.\n3. Suggest ONE concrete action they can take today.\nKeep under 150 words. Be positive and direct.` },
+  { id: 'friend', label: 'Curious friend', prompt: `You are a genuinely curious, warm friend reading someone's journal. When they share:\n1. Pick the most interesting part and reflect it back.\n2. Share a personal-feeling observation.\n3. Ask a fun unexpected question.\nKeep under 150 words. Sound like a real friend texting.` }
+];
+
+const INSIGHTS_PROMPT = `Analyse this journal entry and return ONLY valid JSON, no markdown:
+{"mood_score":<1-10>,"mood_label":"<one word>","themes":["<t1>","<t2>","<t3>"],"highlight_quote":"<exact sentence from entry>","action_item":"<one concrete action>","summary":"<2 sentence third-person summary>"}`;
+
+const CANVA_TEMPLATE = 'https://www.canva.com/d/yHIEsSSc7ZtN8Oj';
+
+const SEED_FEED = [
+  { id: 1, author: 'Meera S.', avatar: '#7a9e7e', text: 'Today I finally said no to something that was draining me. It felt uncomfortable at first, like I was letting someone down — but then I realised I had been letting myself down for months. Progress isn\'t always loud.', tags: ['Boundaries', 'Growth'], mood: 'Hopeful', likes: 14 },
+  { id: 2, author: 'Arjun K.', avatar: '#c4622d', text: 'The morning was foggy but I sat with my chai and just... watched the light change. No phone, no news. I keep forgetting that the simplest moments are sometimes the most full.', tags: ['Gratitude', 'Presence'], mood: 'Grateful', likes: 23 },
+  { id: 3, author: 'Priya M.', avatar: '#534ab7', text: "I\'ve been anxious about the presentation all week. But my mentor reminded me — the nervousness means I care. Maybe caring is the point, not the performance.", tags: ['Anxiety', 'Work'], mood: 'Anxious', likes: 9 },
+  { id: 4, author: 'Ravi T.', avatar: '#c9933a', text: "Spent an hour going through old photos tonight. It's strange — I was so unhappy in some of those moments, but I looked completely fine on the outside. I want to learn to be more honest about what I\'m actually feeling.", tags: ['Honesty', 'Reflection'], mood: 'Reflective', likes: 17 },
+  { id: 5, author: 'Asha N.', avatar: '#c4622d', text: 'Started therapy today. I was terrified. But my therapist asked me what I was most proud of, and I realised I hadn\'t thought about that in years. I\'m going to sit with that question.', tags: ['Growth', 'Healing'], mood: 'Hopeful', likes: 31 }
+];
+
+let activePersona = PERSONAS[0];
+let isPublic = false;
+let entries = JSON.parse(localStorage.getItem('inkwell_entries') || '[]');
+let feedData = JSON.parse(localStorage.getItem('inkwell_feed') || JSON.stringify(SEED_FEED));
+let likedIds = JSON.parse(localStorage.getItem('inkwell_liked') || '[]');
+let currentInsights = null;
+let currentFilter = 'all';
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.nav-link').forEach(b => {
+    if (b.textContent.toLowerCase().includes(name === 'home' ? 'home' : name === 'write' ? 'write' : name === 'community' ? 'community' : 'streak')) b.classList.add('active');
+  });
+  if (name === 'streaks') renderStreakPage();
+  if (name === 'community') renderFeed();
+  if (name === 'home') renderHomeBanner();
+}
+
+function init() {
+  const now = new Date();
+  document.getElementById('write-date').textContent = now.toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  const pills = document.getElementById('persona-pills');
+  PERSONAS.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'persona-pill' + (p.id === activePersona.id ? ' active' : '');
+    btn.textContent = p.label; btn.id = 'pill-' + p.id;
+    btn.onclick = () => selectPersona(p);
+    pills.appendChild(btn);
+  });
+  document.getElementById('prompt-viewer').textContent = activePersona.prompt;
+
+  document.getElementById('journal-input').addEventListener('input', e => {
+    const words = e.target.value.trim().split(/\s+/).filter(Boolean).length;
+    document.getElementById('word-count').textContent = words + ' words';
+  });
+
+  renderPastEntries();
+  renderHomeBanner();
+  renderFeed();
+}
+
+function selectPersona(p) {
+  activePersona = p;
+  document.querySelectorAll('.persona-pill').forEach(b => b.classList.remove('active'));
+  document.getElementById('pill-' + p.id).classList.add('active');
+  document.getElementById('prompt-viewer').textContent = p.prompt;
+}
+
+function togglePublic() {
+  isPublic = !isPublic;
+  const btn = document.getElementById('public-btn');
+  btn.classList.toggle('on', isPublic);
+  btn.innerHTML = isPublic
+    ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg> Public`
+    : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Private`;
+}
+
+function togglePrompt() {
+  document.getElementById('prompt-viewer').classList.toggle('open');
+}
+
+async function callClaude(system, user) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514', max_tokens: 1000,
+      system, messages: [{ role: 'user', content: user }]
+    })
+  });
+  const d = await res.json();
+  return d.content?.[0]?.text || '';
+}
+
+async function reflect() {
+  const text = document.getElementById('journal-input').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('reflect-btn');
+  btn.disabled = true;
+  currentInsights = null;
+  document.getElementById('insights-sidebar').style.display = 'none';
+  document.getElementById('canva-status').textContent = '';
+  document.getElementById('copy-btn').style.display = 'none';
+  document.getElementById('canva-link').style.display = 'none';
+
+  const card = document.getElementById('reflection-card');
+  const textEl = document.getElementById('reflection-text');
+  const byline = document.getElementById('reflection-byline');
+  card.classList.add('visible');
+  byline.textContent = activePersona.label + ' is reflecting...';
+  textEl.innerHTML = '<div class="loading-wave"><span></span><span></span><span></span></div>';
+
+  try {
+    const reply = await callClaude(activePersona.prompt, 'Journal entry:\n\n' + text);
+    textEl.textContent = reply;
+    byline.textContent = activePersona.label;
+
+    const entry = {
+      id: Date.now(), date: new Date().toISOString(),
+      text, reply, persona: activePersona.label,
+      isPublic
+    };
+    entries.unshift(entry);
+    localStorage.setItem('inkwell_entries', JSON.stringify(entries.slice(0, 50)));
+
+    if (isPublic) {
+      const pub = {
+        id: Date.now() + 1, author: 'You',
+        avatar: '#c4622d', text: text.slice(0, 240) + (text.length > 240 ? '...' : ''),
+        tags: ['Personal'], mood: 'Reflective', likes: 0, isYours: true
+      };
+      feedData.unshift(pub);
+      localStorage.setItem('inkwell_feed', JSON.stringify(feedData));
+    }
+
+    updateStreak();
+    renderPastEntries();
+    renderHomeBanner();
+    document.getElementById('insights-sidebar').style.display = 'block';
+
+  } catch(e) {
+    textEl.textContent = 'Could not connect to Claude. Make sure you are using the Claude artifact viewer.';
+  }
+  btn.disabled = false;
+}
+
+async function createInfographic() {
+  const text = document.getElementById('journal-input').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('canva-btn');
+  const status = document.getElementById('canva-status');
+  btn.disabled = true;
+  status.textContent = 'Analysing entry...';
+
+  try {
+    const raw = await callClaude(INSIGHTS_PROMPT, 'Entry:\n\n' + text);
+    const insights = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    currentInsights = insights;
+    renderInsights(insights);
+    status.textContent = 'Ready — open Canva and paste the insights.';
+    document.getElementById('copy-btn').style.display = 'block';
+    document.getElementById('canva-link').style.display = 'block';
+    window._copyText = `Mood: ${insights.mood_label} (${insights.mood_score}/10)\nThemes: ${(insights.themes||[]).join(', ')}\nQuote: "${insights.highlight_quote}"\nAction: ${insights.action_item}\nSummary: ${insights.summary}`;
+  } catch(e) {
+    status.textContent = 'Error: ' + (e.message || 'Could not analyse entry.');
+  }
+  btn.disabled = false;
+}
+
+function copyInsights() {
+  const text = window._copyText;
+  if (!text) return;
+  const btn = document.getElementById('copy-btn');
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy insights text'; }, 2500);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'absolute'; ta.style.left = '-9999px';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy insights text'; }, 2500);
+  });
+}
+
+function renderInsights(insights) {
+  const pct = Math.round((insights.mood_score / 10) * 100);
+  const themes = (insights.themes || []).map(t => `<span class="theme-tag">${t}</span>`).join('');
+  document.getElementById('insights-content').innerHTML = `
+    <div class="insight-row">
+      <div class="insight-key">Highlight</div>
+      <div class="insight-val" style="font-style:italic">"${insights.highlight_quote}"</div>
+    </div>
+    <div class="insight-row">
+      <div class="insight-key">Mood — ${insights.mood_label} ${insights.mood_score}/10</div>
+      <div class="mood-track"><div class="mood-fill" style="width:${pct}%"></div></div>
+    </div>
+    <div class="insight-row">
+      <div class="insight-key">Themes</div>
+      <div class="theme-row">${themes}</div>
+    </div>
+    <div class="insight-row">
+      <div class="insight-key">Action</div>
+      <div class="insight-val">${insights.action_item}</div>
+    </div>
+  `;
+}
+
+function updateStreak() {
+  const today = new Date().toDateString();
+  const streak = JSON.parse(localStorage.getItem('inkwell_streak') || '{"count":0,"lastDate":"","dates":[]}');
+  if (streak.lastDate === today) return;
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  streak.count = streak.lastDate === yesterday.toDateString() ? streak.count + 1 : 1;
+  streak.lastDate = today;
+  if (!streak.dates) streak.dates = [];
+  streak.dates.push(today);
+  localStorage.setItem('inkwell_streak', JSON.stringify(streak));
+}
+
+function getStreak() {
+  return JSON.parse(localStorage.getItem('inkwell_streak') || '{"count":0,"lastDate":"","dates":[]}');
+}
+
+function renderHomeBanner() {
+  const streak = getStreak();
+  if (streak.count > 0) {
+    document.getElementById('home-streak-banner').style.display = 'block';
+    document.getElementById('home-streak-num').textContent = streak.count;
+    const dots = document.getElementById('home-streak-dots');
+    dots.innerHTML = '';
+    const days = ['M','T','W','T','F','S','S'];
+    const today = new Date().getDay();
+    days.forEach((d, i) => {
+      const dot = document.createElement('div');
+      const adj = (i + 1) % 7;
+      dot.className = 'streak-dot' + (adj === today ? ' today' : i < today ? ' done' : '');
+      dot.textContent = d;
+      dots.appendChild(dot);
+    });
+  }
+}
+
+function renderPastEntries() {
+  const el = document.getElementById('past-entries-list');
+  if (entries.length === 0) { el.innerHTML = '<p style="font-size:0.82rem;color:var(--ink-muted);font-style:italic">Your entries will appear here.</p>'; return; }
+  el.innerHTML = entries.slice(0, 4).map(e => `
+    <div style="padding:10px 0; border-bottom:1px solid var(--border); cursor:pointer" onclick="loadEntry(${e.id})">
+      <div style="font-size:0.75rem;color:var(--ink-muted);margin-bottom:3px">${new Date(e.date).toLocaleDateString('en-IN',{month:'short',day:'numeric'})}</div>
+      <div style="font-family:'Lora',serif;font-size:0.85rem;color:var(--ink-light);line-height:1.5">${e.text.slice(0,70)}...</div>
+    </div>`).join('');
+}
+
+function loadEntry(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  document.getElementById('journal-input').value = e.text;
+  document.getElementById('reflection-card').classList.add('visible');
+  document.getElementById('reflection-byline').textContent = e.persona;
+  document.getElementById('reflection-text').textContent = e.reply;
+  document.getElementById('insights-sidebar').style.display = 'block';
+  window.scrollTo(0,0);
+}
+
+function renderFeed() {
+  const list = document.getElementById('feed-list');
+  const filtered = currentFilter === 'all' ? feedData : feedData.filter(e => e.mood === currentFilter);
+  if (filtered.length === 0) { list.innerHTML = '<p style="color:var(--ink-muted);font-style:italic;font-size:0.9rem">No entries with this mood yet.</p>'; return; }
+  list.innerHTML = filtered.map(e => {
+    const isLiked = likedIds.includes(e.id);
+    const tags = (e.tags||[]).map(t => `<span class="feed-tag">${t}</span>`).join('');
+    return `
+    <div class="feed-entry">
+      <div class="feed-meta">
+        <div class="feed-avatar" style="background:${e.avatar}">${e.author[0]}</div>
+        <div>
+          <div class="feed-author">${e.author}</div>
+          <div style="font-size:0.72rem;color:var(--ink-muted)">${e.mood || ''}</div>
+        </div>
+        <div class="feed-date">${new Date(e.date || Date.now()).toLocaleDateString('en-IN',{month:'short',day:'numeric'})}</div>
+      </div>
+      <div class="feed-text">${e.text}</div>
+      <div class="feed-tags">${tags}</div>
+      <button class="feed-heart ${isLiked ? 'liked' : ''}" onclick="toggleLike(${e.id})">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="${isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+        ${(e.likes||0) + (isLiked ? 0 : 0)} ${isLiked ? 'liked' : 'like'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function filterFeed(mood, btn) {
+  currentFilter = mood;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFeed();
+}
+
+function toggleLike(id) {
+  const idx = likedIds.indexOf(id);
+  if (idx === -1) { likedIds.push(id); feedData.find(e => e.id === id && (e.likes = (e.likes||0) + 1)); }
+  else { likedIds.splice(idx, 1); feedData.find(e => e.id === id && (e.likes = Math.max(0,(e.likes||0) - 1))); }
+  localStorage.setItem('inkwell_liked', JSON.stringify(likedIds));
+  localStorage.setItem('inkwell_feed', JSON.stringify(feedData));
+  renderFeed();
+}
+
+function renderStreakPage() {
+  const streak = getStreak();
+  document.getElementById('streak-big-num').textContent = streak.count;
+
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const writtenDates = new Set((streak.dates || []).map(d => new Date(d).getDate()));
+  for (let d = 1; d <= daysInMonth; d++) {
+    const div = document.createElement('div');
+    const isToday = d === today.getDate();
+    const isFuture = d > today.getDate();
+    div.className = 'cal-day' + (isToday ? ' today-cal' : writtenDates.has(d) ? ' wrote' : isFuture ? ' future' : '');
+    div.textContent = d;
+    grid.appendChild(div);
+  }
+
+  const habits = [
+    { name: 'Daily writing', pct: Math.min(100, streak.count * 14), stat: streak.count + ' day streak' },
+    { name: 'Morning pages', pct: 60, stat: '3 this week' },
+    { name: 'Gratitude practice', pct: 80, stat: '4 this week' },
+    { name: 'Evening reflection', pct: 40, stat: '2 this week' }
+  ];
+  document.getElementById('habits-grid').innerHTML = habits.map(h => `
+    <div class="habit-card">
+      <div class="habit-name">${h.name}</div>
+      <div class="habit-bar"><div class="habit-fill" style="width:${h.pct}%"></div></div>
+      <div class="habit-stat">${h.stat}</div>
+    </div>`).join('');
+}
+
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Nav
+  document.getElementById('nav-home').addEventListener('click', () => showPage('home'));
+  document.getElementById('nav-community').addEventListener('click', () => showPage('community'));
+  document.getElementById('nav-streaks').addEventListener('click', () => showPage('streaks'));
+  document.getElementById('nav-write').addEventListener('click', () => showPage('write'));
+
+  // Hero
+  document.getElementById('hero-start').addEventListener('click', () => showPage('write'));
+  document.getElementById('hero-community').addEventListener('click', () => showPage('community'));
+
+  // Write page
+  document.getElementById('reflect-btn').addEventListener('click', reflect);
+  document.getElementById('public-btn').addEventListener('click', togglePublic);
+  document.getElementById('canva-btn').addEventListener('click', createInfographic);
+  document.getElementById('prompt-toggle-btn').addEventListener('click', togglePrompt);
+  document.getElementById('copy-btn').addEventListener('click', copyInsights);
+
+  // Filter buttons
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      filterFeed(this.dataset.filter, this);
+    });
+  });
+
+  init();
+});
+</script>
+</body>
+</html>
